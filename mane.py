@@ -1,84 +1,86 @@
 import pygame
 import pygame_menu
 import sqlite3
-import re
 from flower import Flower
 from random import randint
 
-pygame.init()
-pygame.time.set_timer(pygame.USEREVENT, 2000)
-pygame.display.set_caption('flowers drop pygame', 'img/people2.png')
-f = pygame.font.SysFont('arial', 30)
+# Constants
 W, H = 900, 600
+FPS = 40
+FLOWER_DROP_INTERVAL = 2000  # ms
+SPEED = 10
+FLOWERS_DATA = [{'path': 'flower1.png', 'score': 10},
+                {'path': 'flower2.png', 'score': 15},
+                {'path': 'flower3.png', 'score': 20}]
+PLAYER_NAME_DB = 'players_name.db'
+PLAYER_NAME_TABLE = 'players_name'
+
+# Initialize Pygame
+pygame.init()
+pygame.time.set_timer(pygame.USEREVENT, FLOWER_DROP_INTERVAL)
+pygame.display.set_caption('Flowers Drop Pygame')
+
+# Create the screen
 sc = pygame.display.set_mode((W, H))
 clock = pygame.time.Clock()
-FPS = 40
+f = pygame.font.SysFont('arial', 30)
 game_score = 0
-speed = 10
-data = []
-running = True
 game_play = False
-menu = None
 player_name = 'Player1'
 
+# Database
+with sqlite3.connect(PLAYER_NAME_DB) as db:
+    cursor = db.cursor()
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS {PLAYER_NAME_TABLE} (name text, score integer)')
+    db.commit()
 
-# база данных
-db = sqlite3.connect('players_name.db')
-cursor = db.cursor()
-cursor.execute('CREATE TABLE IF NOT EXISTS players_name ( name text, score integer)')
-db.commit()
-
-
-# все спрайты
+# Load images
 people = pygame.image.load('img/people2.png')
-people = pygame.transform.scale(people, (people.get_width()//5, people.get_height()//5)).convert_alpha()
-people_rect = people.get_rect(centerx=W//2, bottom=H-5)
-# people_right = people_rect
-# people_left = pygame.transform.flip(people, 1, 0)
+people = pygame.transform.scale(people, (people.get_width() // 5, people.get_height() // 5)).convert_alpha()
+people_rect = people.get_rect(centerx=W // 2, bottom=H - 5)
+
 trig = pygame.image.load('img/trigger.png')
-trig_rect = trig.get_rect(centerx=W//2, y=590)
+trig_rect = trig.get_rect(centerx=W // 2, y=590)
 
-flowers_data = ({'path': 'flower1.png', 'score': 10},
-                {'path': 'flower2.png', 'score': 15},
-                {'path': 'flower3.png', 'score': 20})
-
-flowers_surf = [pygame.image.load('img/'+data['path']).convert_alpha() for data in flowers_data]
+flowers_surf = [pygame.image.load('img/' + data['path']).convert_alpha() for data in FLOWERS_DATA]
 flowers = pygame.sprite.Group()
 
 
+# Function to create a flower
 def create_flower(group):
     indx = randint(0, len(flowers_surf) - 1)
     x = randint(20, W - 20)
     speed = randint(1, 4)
+    return Flower(x, speed, flowers_surf[indx], FLOWERS_DATA[indx]['score'], group)
 
-    return Flower(x, speed, flowers_surf[indx], flowers_data[indx]['score'], group)
 
-
+# Function to handle collisions with flowers
 def collide_flower():
     global game_score
-    for flower1 in flowers:
-        if people_rect.colliderect(flower1.rect):
-            game_score += flower1.score
-            flower1.kill()
+    for flower in flowers:
+        if people_rect.colliderect(flower.rect):
+            game_score += flower.score
+            flower.kill()
 
 
+# Function to start the game
 def start_the_game():
     global game_play
     game_play = True
     menu.disable()
 
 
+# Function to update the player name
 def my_name(name):
     global player_name
     print('Player name is', name)
     player_name = name
 
 
-def show_menu1():
+# Function to display the main menu
+def show_menu():
     global menu
-    global data
-    data = []
-    menu = pygame_menu.Menu('flowers fall', 900, 600, theme=pygame_menu.themes.THEME_SOLARIZED)
+    menu = pygame_menu.Menu('Flowers Fall', W, H, theme=pygame_menu.themes.THEME_SOLARIZED)
     frame = menu.add.frame_h(500, 300, background_color=(238, 231, 213), padding=0)
     frame_left = menu.add.frame_v(250, 300, background_color=(238, 231, 213), padding=0)
     frame_right = menu.add.frame_v(250, 300, background_color=(238, 231, 213), padding=0)
@@ -88,21 +90,18 @@ def show_menu1():
     frame_left.pack(menu.add.button('Play', start_the_game))
     frame_left.pack(menu.add.button('Quit', pygame_menu.events.EXIT))
 
-    cursor.execute('SELECT * FROM players_name ORDER BY score DESC LIMIT 5')
-    for i in cursor.fetchall():
-        x = re.findall("\w+", str(i))
-        str_ns = ''
-        for s in x:
-            str_ns += s + ' '
-        frame_right.pack(menu.add.label(str_ns))
+    cursor.execute(f'SELECT * FROM {PLAYER_NAME_TABLE} ORDER BY score DESC LIMIT 5')
+    for row in cursor.fetchall():
+        name, score = row
+        frame_right.pack(menu.add.label(f'{name} {score}'))
 
     menu.mainloop(sc)
 
 
-while running:
+while True:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            running = False
+            pygame.quit()
             exit()
         elif event.type == pygame.USEREVENT:
             create_flower(flowers)
@@ -117,25 +116,24 @@ while running:
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT]:
-            people_rect.x -= speed
+            people_rect.x -= SPEED
             if people_rect.x < 0:
                 people_rect.x = 0
         elif keys[pygame.K_RIGHT]:
-            people_rect.x += speed
-            if people_rect.x > W-people_rect.width:
-                people_rect.x = W-people_rect.width
+            people_rect.x += SPEED
+            if people_rect.x > W - people_rect.width:
+                people_rect.x = W - people_rect.width
 
     else:
-        show_menu1()
+        show_menu()
 
     for flower in flowers:
         if trig_rect.colliderect(flower):
             game_play = False
             print(player_name)
-            data.append((player_name, game_score))
-            cursor.executemany('INSERT INTO players_name VALUES (?, ?)', data)
+            cursor.executemany(f'INSERT INTO {PLAYER_NAME_TABLE} VALUES (?, ?)', [(player_name, game_score)])
             db.commit()
-            cursor.execute('SELECT * FROM players_name')
+            cursor.execute(f'SELECT * FROM {PLAYER_NAME_TABLE}')
             print(cursor.fetchall())
             game_score = 0
             flowers.empty()
@@ -144,5 +142,3 @@ while running:
     flowers.update(H)
     collide_flower()
     clock.tick(FPS)
-
-db.close()
