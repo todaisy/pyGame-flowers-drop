@@ -45,6 +45,12 @@ trig_rect = trig.get_rect(centerx=W // 2, y=590)
 flowers_surf = [pygame.image.load('img/' + data['path']).convert_alpha() for data in FLOWERS_DATA]
 flowers = pygame.sprite.Group()
 
+# Load music
+pygame.mixer_music.load('msc/c152-hold-up.mp3')
+pygame.mixer_music.set_volume(0.3)
+bubble = pygame.mixer.Sound('msc/bub.mp3')
+fail = pygame.mixer.Sound('msc/fail-wha-wha-version.mp3')
+
 
 # Function to create a flower
 def create_flower(group):
@@ -60,6 +66,7 @@ def collide_flower():
     for flower in flowers:
         if people_rect.colliderect(flower.rect):
             game_score += flower.score
+            pygame.mixer.Sound.play(bubble)
             flower.kill()
 
 
@@ -67,13 +74,13 @@ def collide_flower():
 def start_the_game():
     global game_play
     game_play = True
+    pygame.mixer_music.play(-1)
     menu.disable()
 
 
 # Function to update the player name
 def my_name(name):
     global player_name
-    print('Player name is', name)
     player_name = name
 
 
@@ -84,8 +91,10 @@ def show_menu():
     frame = menu.add.frame_h(500, 300, background_color=(238, 231, 213), padding=0)
     frame_left = menu.add.frame_v(250, 300, background_color=(238, 231, 213), padding=0)
     frame_right = menu.add.frame_v(250, 300, background_color=(238, 231, 213), padding=0)
+    frame_text = menu.add.frame_h(520, 60, background_color=(238, 231, 213), padding=0)
     frame.pack(frame_left)
     frame.pack(frame_right)
+    frame_text.pack(menu.add.label(f'Catch falling flowers and get points!'))
     frame_left.pack(menu.add.text_input('Name: ', default=player_name, onchange=my_name))
     frame_left.pack(menu.add.button('Play', start_the_game))
     frame_left.pack(menu.add.button('Quit', pygame_menu.events.EXIT))
@@ -130,11 +139,10 @@ while True:
     for flower in flowers:
         if trig_rect.colliderect(flower):
             game_play = False
-            print(player_name)
             cursor.executemany(f'INSERT INTO {PLAYER_NAME_TABLE} VALUES (?, ?)', [(player_name, game_score)])
             db.commit()
-            cursor.execute(f'SELECT * FROM {PLAYER_NAME_TABLE}')
-            print(cursor.fetchall())
+            pygame.mixer_music.stop()
+            pygame.mixer.Sound.play(fail)
             game_score = 0
             flowers.empty()
 
