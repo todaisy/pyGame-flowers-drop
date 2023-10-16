@@ -1,7 +1,7 @@
 import pygame
 
 
-class Flower(pygame.sprite.Sprite):
+class Flower(pygame.sprite.Sprite): # Наследование от Sprite
     def __init__(self, x, speed, surf, score, group):
         pygame.sprite.Sprite.__init__(self)
         self.image = surf
